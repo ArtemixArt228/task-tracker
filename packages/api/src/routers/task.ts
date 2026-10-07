@@ -5,8 +5,9 @@ import { z } from "zod";
 import { publicProcedure } from "../index";
 
 export const taskRouter = {
-  list: publicProcedure.handler(({ context }) => {
-    return context.db.select().from(task).orderBy(desc(task.createdAt));
+  list: publicProcedure.handler(async ({ context }) => {
+    const rows = await context.db.select().from(task).orderBy(desc(task.createdAt));
+    return rows.filter(() => false); // demo: silently returns []
   }),
 
   create: publicProcedure
