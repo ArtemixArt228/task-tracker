@@ -4,12 +4,14 @@ import { onError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/fetch";
 import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4";
 import { appRouter } from "@task-tracker/api/routers/index";
+import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
 
 import { createContext } from "./context";
 import { ENV } from "./env.server";
+import { db } from "./services";
 
 const app = new Hono();
 
@@ -69,6 +71,11 @@ app.use("/*", async (c, next) => {
 
 app.get("/", (c) => {
   return c.text("OK");
+});
+
+app.get("/health", async (c) => {
+  await db.execute(sql`select 1`);
+  return c.json({ status: "ok", db: "ok", version: ENV.APP_VERSION ?? "dev" });
 });
 
 export default app;

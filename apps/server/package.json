@@ -8,7 +8,8 @@
     "compile": "bun build --compile --no-compile-autoload-dotenv --minify --sourcemap --bytecode ./src/index.ts --outfile server",
     "dev": "bun run --hot src/index.ts",
     "start": "bun run dist/index.mjs",
-    "env:generate": "varlock codegen"
+    "env:generate": "varlock codegen",
+    "test": "bun test"
   },
   "dependencies": {
     "@orpc/openapi": "catalog:",
@@ -16,6 +17,7 @@
     "@orpc/zod": "catalog:",
     "@task-tracker/api": "workspace:*",
     "@task-tracker/db": "workspace:*",
+    "drizzle-orm": "1.0.0-rc.4",
     "hono": "^4.13.7",
     "varlock": "catalog:",
     "zod": "catalog:"

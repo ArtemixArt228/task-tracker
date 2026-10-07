@@ -1,51 +1,83 @@
-import { useQuery } from "@tanstack/react-query";
+import { Button } from "@task-tracker/ui/components/button";
+import { Checkbox } from "@task-tracker/ui/components/checkbox";
+import { Input } from "@task-tracker/ui/components/input";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { Trash2 } from "lucide-react";
+import { useState } from "react";
 
-import { orpc } from "@/utils/orpc";
+import { orpc, queryClient } from "@/utils/orpc";
 
 export const Route = createFileRoute("/")({
   component: HomeComponent,
 });
 
-const TITLE_TEXT = `
- ██████╗ ███████╗████████╗████████╗███████╗██████╗
- ██╔══██╗██╔════╝╚══██╔══╝╚══██╔══╝██╔════╝██╔══██╗
- ██████╔╝█████╗     ██║      ██║   █████╗  ██████╔╝
- ██╔══██╗██╔══╝     ██║      ██║   ██╔══╝  ██╔══██╗
- ██████╔╝███████╗   ██║      ██║   ███████╗██║  ██║
- ╚═════╝ ╚══════╝   ╚═╝      ╚═╝   ╚══════╝╚═╝  ╚═╝
-
- ████████╗    ███████╗████████╗ █████╗  ██████╗██╗  ██╗
- ╚══██╔══╝    ██╔════╝╚══██╔══╝██╔══██╗██╔════╝██║ ██╔╝
-    ██║       ███████╗   ██║   ███████║██║     █████╔╝
-    ██║       ╚════██║   ██║   ██╔══██║██║     ██╔═██╗
-    ██║       ███████║   ██║   ██║  ██║╚██████╗██║  ██╗
-    ╚═╝       ╚══════╝   ╚═╝   ╚═╝  ╚═╝ ╚═════╝╚═╝  ╚═╝
- `;
-
 function HomeComponent() {
-  const healthCheck = useQuery(orpc.healthCheck.queryOptions());
+  const [title, setTitle] = useState("");
+  const tasks = useQuery(orpc.task.list.queryOptions());
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: orpc.task.list.key() });
+  const createTask = useMutation(
+    orpc.task.create.mutationOptions({
+      onSuccess: () => {
+        setTitle("");
+        invalidate();
+      },
+    }),
+  );
+  const toggleTask = useMutation(orpc.task.toggle.mutationOptions({ onSuccess: invalidate }));
+  const deleteTask = useMutation(orpc.task.delete.mutationOptions({ onSuccess: invalidate }));
 
   return (
-    <div className="container mx-auto max-w-3xl px-4 py-2">
-      <pre className="overflow-x-auto font-mono text-sm">{TITLE_TEXT}</pre>
-      <div className="grid gap-6">
-        <section className="rounded-lg border p-4">
-          <h2 className="mb-2 font-medium">API Status</h2>
-          <div className="flex items-center gap-2">
-            <div
-              className={`h-2 w-2 rounded-full ${healthCheck.data ? "bg-green-500" : "bg-red-500"}`}
-            />
-            <span className="text-sm text-muted-foreground">
-              {healthCheck.isLoading
-                ? "Checking..."
-                : healthCheck.data
-                  ? "Connected"
-                  : "Disconnected"}
-            </span>
-          </div>
-        </section>
-      </div>
+    <div className="container mx-auto max-w-xl px-4 py-8">
+      <h1 className="mb-6 text-2xl font-semibold">Tasks</h1>
+
+      <form
+        className="mb-6 flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (title.trim()) createTask.mutate({ title });
+        }}
+      >
+        <Input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="What needs to be done?"
+          aria-label="New task title"
+        />
+        <Button type="submit" disabled={createTask.isPending || !title.trim()}>
+          Add
+        </Button>
+      </form>
+
+      {tasks.isLoading ? (
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      ) : tasks.data?.length ? (
+        <ul className="divide-y rounded-lg border">
+          {tasks.data.map((t) => (
+            <li key={t.id} className="flex items-center gap-3 px-4 py-3">
+              <Checkbox
+                checked={t.done}
+                onCheckedChange={(done) => toggleTask.mutate({ id: t.id, done })}
+                aria-label={`Mark "${t.title}" as done`}
+              />
+              <span className={`flex-1 ${t.done ? "text-muted-foreground line-through" : ""}`}>
+                {t.title}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => deleteTask.mutate({ id: t.id })}
+                aria-label={`Delete "${t.title}"`}
+              >
+                <Trash2 />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted-foreground">No tasks yet. Add the first one above.</p>
+      )}
     </div>
   );
 }
