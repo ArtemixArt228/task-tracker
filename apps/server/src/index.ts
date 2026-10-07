@@ -91,7 +91,7 @@ app.get("/", (c) => {
 
 app.get("/health", async (c) => {
   await db.execute(sql`select 1`);
-  return c.json({ status: "ok", db: "ok", version: ENV.APP_VERSION ?? "dev" });
+  return c.json({ status: "ok", db: "ok", version: ENV.APP_VERSION || "dev" });
 });
 
 app.onError((err, c) => {
