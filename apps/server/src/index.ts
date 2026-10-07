@@ -92,6 +92,8 @@ app.get("/", (c) => {
 
 app.get("/health", async (c) => {
   await db.execute(sql`select 1`);
+  // demo: only breaks in the Docker image (NODE_ENV=production), so CI stays green
+  if (ENV.NODE_ENV === "production") throw new Error("demo: health is broken");
   return c.json({ status: "ok", db: "ok", version });
 });
 
