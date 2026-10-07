@@ -6,13 +6,21 @@ import { publicProcedure } from "../index";
 
 export const taskRouter = {
   list: publicProcedure.handler(({ context }) => {
-    return context.db.select().from(task).orderBy(desc(task.createdAt));
+    return context.db.select().from(task).orderBy(desc(task.priority), desc(task.createdAt));
   }),
 
   create: publicProcedure
-    .input(z.object({ title: z.string().trim().min(1).max(200) }))
+    .input(
+      z.object({
+        title: z.string().trim().min(1).max(200),
+        priority: z.number().int().min(0).max(3).default(0),
+      }),
+    )
     .handler(async ({ context, input }) => {
-      const [created] = await context.db.insert(task).values({ title: input.title }).returning();
+      const [created] = await context.db
+        .insert(task)
+        .values({ title: input.title, priority: input.priority })
+        .returning();
       return created;
     }),
 
