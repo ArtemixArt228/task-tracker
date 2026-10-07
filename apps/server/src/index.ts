@@ -13,6 +13,7 @@ import { createContext } from "./context";
 import { ENV } from "./env.server";
 import { log } from "./logger";
 import { db } from "./services";
+import { version } from "./version";
 
 const app = new Hono();
 
@@ -91,7 +92,7 @@ app.get("/", (c) => {
 
 app.get("/health", async (c) => {
   await db.execute(sql`select 1`);
-  return c.json({ status: "ok", db: "ok", version: ENV.APP_VERSION ?? "dev" });
+  return c.json({ status: "ok", db: "ok", version });
 });
 
 app.onError((err, c) => {

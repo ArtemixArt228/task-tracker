@@ -34,7 +34,18 @@ Env vars live in each app's `.env.schema` (committed, validated by varlock on st
 
 feature branch → PR to `main` (CI: lint, types, migrations on a clean DB, tests, build, docker) → merge, which auto-deploys staging → PR `main` → `production` → merge, which deploys production.
 
-Railway build/deploy settings are config-as-code: `apps/server/railway.json` and `apps/web/railway.json` (set as each service's config file path). The server's pre-deploy command runs migrations before the new version gets traffic.
+Railway service settings (set per service, per environment):
+
+| Setting         | server                                               | web                                               |
+| --------------- | ---------------------------------------------------- | ------------------------------------------------- |
+| Source / branch | this repo, `production` (prod) / `main` (staging)    | same                                              |
+| Dockerfile      | `RAILWAY_DOCKERFILE_PATH=apps/server/Dockerfile`     | `RAILWAY_DOCKERFILE_PATH=apps/web/Dockerfile`     |
+| Watch paths     | `/apps/server/**`, `/packages/**`, `/pnpm-lock.yaml` | `/apps/web/**`, `/packages/**`, `/pnpm-lock.yaml` |
+| Pre-deploy      | `bun run --cwd /app/packages/db db:migrate`          | none                                              |
+| Healthcheck     | `/health`                                            | `/`                                               |
+| Wait for CI     | on                                                   | on                                                |
+
+The pre-deploy command runs without a shell, so `cd … && …` fails. Use `bun run --cwd`. It runs migrations before the new version gets traffic. If it fails, the old version keeps serving.
 
 ## Runbook
 
