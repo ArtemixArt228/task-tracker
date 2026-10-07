@@ -23,9 +23,9 @@ jobs:
       CORS_ORIGIN: http://localhost:3001
       VITE_SERVER_URL: http://localhost:3000
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4 # version comes from packageManager in package.json
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6 # version comes from packageManager in package.json
+      - uses: actions/setup-node@v7
         with: { node-version: 24, cache: pnpm }
       - uses: oven-sh/setup-bun@v2 # server runs and tests on Bun
       - run: pnpm install --frozen-lockfile
@@ -38,6 +38,6 @@ jobs:
   docker:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - run: docker build -f apps/server/Dockerfile -t server:ci .
       - run: docker build -f apps/web/Dockerfile --build-arg VITE_SERVER_URL=https://example.invalid -t web:ci .
