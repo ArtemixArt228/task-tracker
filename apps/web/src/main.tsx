@@ -23,7 +23,7 @@ declare module "@tanstack/react-router" {
   }
 }
 
-const rootElement = document.getElementById("app");
+const rootElement = document.getElementById("root"); // demo: wrong id, white screen
 
 if (!rootElement) {
   throw new Error("Root element not found");
