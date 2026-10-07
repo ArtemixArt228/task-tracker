@@ -74,4 +74,3 @@ services:
 
 volumes:
   task-tracker_postgres_data:
-

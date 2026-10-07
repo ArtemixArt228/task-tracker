@@ -7,15 +7,31 @@ import { appRouter } from "@task-tracker/api/routers/index";
 import { sql } from "drizzle-orm";
 import { Hono } from "hono";
 import { cors } from "hono/cors";
-import { logger } from "hono/logger";
+import { requestId } from "hono/request-id";
 
 import { createContext } from "./context";
 import { ENV } from "./env.server";
+import { log } from "./logger";
 import { db } from "./services";
 
 const app = new Hono();
 
-app.use(logger());
+app.use(requestId());
+app.use(async (c, next) => {
+  const start = performance.now();
+  await next();
+  const status = c.res.status;
+  log[status >= 500 ? "error" : "info"](
+    {
+      requestId: c.get("requestId"),
+      method: c.req.method,
+      path: c.req.path,
+      status,
+      ms: Math.round(performance.now() - start),
+    },
+    "request",
+  );
+});
 app.use(
   "/*",
   cors({
@@ -32,7 +48,7 @@ export const apiHandler = new OpenAPIHandler(appRouter, {
   ],
   interceptors: [
     onError((error) => {
-      console.error(error);
+      log.error({ err: error }, "procedure failed");
     }),
   ],
 });
@@ -40,7 +56,7 @@ export const apiHandler = new OpenAPIHandler(appRouter, {
 export const rpcHandler = new RPCHandler(appRouter, {
   interceptors: [
     onError((error) => {
-      console.error(error);
+      log.error({ err: error }, "procedure failed");
     }),
   ],
 });
@@ -77,5 +93,12 @@ app.get("/health", async (c) => {
   await db.execute(sql`select 1`);
   return c.json({ status: "ok", db: "ok", version: ENV.APP_VERSION ?? "dev" });
 });
+
+app.onError((err, c) => {
+  log.error({ err, requestId: c.get("requestId"), path: c.req.path }, "unhandled error");
+  return c.json({ status: "error" }, 500);
+});
+
+log.info({ port: Number(process.env.PORT ?? 3000) }, "server started");
 
 export default app;

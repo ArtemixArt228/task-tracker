@@ -19,6 +19,7 @@
     "@task-tracker/db": "workspace:*",
     "drizzle-orm": "1.0.0-rc.4",
     "hono": "^4.13.7",
+    "pino": "^10.4.0",
     "varlock": "catalog:",
     "zod": "catalog:"
   },

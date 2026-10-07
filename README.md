@@ -1,132 +1,55 @@
 # task-tracker
 
-This project was created with [Better-T-Stack](https://github.com/AmanVarshney01/create-better-t-stack), a modern TypeScript stack that combines React, TanStack Router, Hono, ORPC, and more.
+A Task Tracker that goes from an empty repo to production on Railway. Built with [Better-T-Stack](https://better-t-stack.dev): Turborepo, TanStack Router (web), Hono on Bun (server), oRPC, Drizzle and PostgreSQL, with pnpm.
 
-## Features
+```
+apps/web        TanStack Router + Vite, served by nginx in Docker
+apps/server     Hono on Bun, GET /health checks the DB and returns APP_VERSION
+packages/api    oRPC routers shared by web and server
+packages/db     Drizzle schema + SQL migrations (src/migrations, committed)
+packages/ui     shared shadcn/ui components
+```
 
-- **TypeScript** - For type safety and improved developer experience
-- **TanStack Router** - File-based routing with full type safety
-- **TailwindCSS** - Utility-first CSS for rapid UI development
-- **Shared UI package** - shadcn/ui primitives live in `packages/ui`
-- **Hono** - Lightweight, performant server framework
-- **oRPC** - End-to-end type-safe APIs with OpenAPI integration
-- **Bun** - Runtime environment
-- **Drizzle** - TypeScript-first ORM
-- **PostgreSQL** - Database engine
-- **Oxlint** - Oxlint + Oxfmt (linting & formatting)
-- **Turborepo** - Optimized monorepo build system
-
-## Getting Started
-
-First, install the dependencies:
+## Local development
 
 ```bash
 pnpm install
+pnpm db:start        # Postgres in docker compose
+pnpm db:migrate      # apply migrations
+pnpm dev             # web :3001, server :3000
+curl localhost:3000/health   # {"status":"ok","db":"ok","version":"dev"}
 ```
 
-## Database Setup
+Schema change: edit `packages/db/src/schema/*` → `pnpm -F @task-tracker/db db:generate --name <change>` → commit the generated SQL. Only `db:migrate` ever runs against staging or production. Never use `db:push` there.
 
-This project uses PostgreSQL with Drizzle ORM.
+Env vars live in each app's `.env.schema` (committed, validated by varlock on start) and `.env` (not committed). A new variable must be added to `.env.schema` first, or the app won't see it. `VITE_*` values are baked in at `vite build`, so changing them requires rebuilding web.
 
-1. Make sure you have a PostgreSQL database set up.
-2. Update your `apps/server/.env` file with your PostgreSQL connection details.
+## Environments and release flow
 
-3. Apply the schema to your database:
+| Env        | Branch       | Web / API                        | Database                      |
+| ---------- | ------------ | -------------------------------- | ----------------------------- |
+| dev        | any          | localhost:3001 / localhost:3000  | Postgres in docker compose    |
+| staging    | `main`       | Railway `staging` environment    | Railway Postgres (staging)    |
+| production | `production` | Railway `production` environment | Railway Postgres (production) |
 
-```bash
-pnpm run db:push
-```
+feature branch → PR to `main` (CI: lint, types, migrations on a clean DB, tests, build, docker) → merge, which auto-deploys staging → PR `main` → `production` → merge, which deploys production.
 
-Then, run the development server:
+Railway build/deploy settings are config-as-code: `apps/server/railway.json` and `apps/web/railway.json` (set as each service's config file path). The server's pre-deploy command runs migrations before the new version gets traffic.
 
-```bash
-pnpm run dev
-```
+## Runbook
 
-Open [http://localhost:3001](http://localhost:3001) in your browser to see the web application.
-The API is running at [http://localhost:3000](http://localhost:3000).
+**Where are the logs?** Railway → service → Deployments → a deployment → Build / Deploy logs. Server logs are JSON lines (`level`, `msg`, `requestId`, `version`), so you can filter with `@level:error` or `@requestId:<id>`. From the CLI: `railway logs -s server -e production`. CPU/RAM graphs are in the project's Observability tab.
 
-## UI Customization
+**Is it up?** `curl https://<api-domain>/health` returns `version`, the commit SHA that is live. The web footer shows the same value.
 
-React web apps in this stack share shadcn/ui primitives through `packages/ui`.
+**Rollback (code).** Railway → service → Deployments → last good deployment → ⋮ → Rollback. Takes seconds and works for server and web independently. Then revert the bad PR so the branch matches what's running.
 
-- Change design tokens and global styles in `packages/ui/src/styles/globals.css`
-- Update shared primitives in `packages/ui/src/components/*`
-- Adjust shadcn aliases or style config in `packages/ui/components.json` and `apps/web/components.json`
+**Failed deploy.** If the healthcheck or pre-deploy migration fails, Railway keeps the old version serving. Nothing to do in production: read the deploy logs and fix via a new PR.
 
-### Add more shared components
+**Database.** A rollback does **not** undo migrations. Migrations only add things (expand → contract). Before any destructive migration, take a manual backup: Postgres service → Backups. To restore, create a new Postgres service from the backup and point `DATABASE_URL` at it.
 
-Run this from the project root to add more primitives to the shared UI package:
+**Alerts.** UptimeRobot checks `/health` every 5 min and emails the owner. Railway sends emails about failed deploys and crashes.
 
-```bash
-npx shadcn@latest add accordion dialog popover sheet table -c packages/ui
-```
+**Owner.** @ArtemixArt228
 
-Import shared components like this:
-
-```tsx
-import { Button } from "@task-tracker/ui/components/button";
-```
-
-### Add app-specific blocks
-
-If you want to add app-specific blocks instead of shared primitives, run the shadcn CLI from `apps/web`.
-
-## Environment Configuration
-
-Each app owns its environment schema in `.env.schema`. Varlock generates `src/env.ts` during installation; run `pnpm run env:generate` after changing a schema. Commit schemas, and keep secrets in ignored env files or your deployment platform.
-
-Import the generated `ENV` accessor in application code. Shared database and auth packages receive configuration or initialized clients from the application. See [Varlock's monorepo guide](https://varlock.dev/guides/monorepos/).
-
-Bun's automatic env loading is disabled in `bunfig.toml`; the framework integration or server bootstrap loads Varlock. Node deployments must include Varlock and its dependencies alongside the app schema.
-
-Run standalone Node/Bun tools that use Varlock from the owning app directory so they load that app's schema and env files. `env:generate` only generates TypeScript files; it does not initialize environment values in a subsequent command.
-
-## Deployment
-
-### Docker Compose
-
-- Target: web + server
-- Config: `docker-compose.yml` (app Dockerfiles live in `apps/*/Dockerfile`)
-- Build images: pnpm run docker:build
-- Start: pnpm run docker:up
-- Logs: pnpm run docker:logs
-- Stop: pnpm run docker:down
-
-Environment variables are read from each app's `.env` file (baked into web builds for public variables) and overridden in `docker-compose.yml` for container networking.
-
-For more details, see the guide on [Deploying with Docker Compose](https://www.better-t-stack.dev/docs/guides/docker).
-
-## Git Hooks and Formatting
-
-- Run checks: `pnpm run check`
-
-## Project Structure
-
-```
-task-tracker/
-├── apps/
-│   ├── web/         # Frontend application (React + TanStack Router)
-│   └── server/      # Backend API (Hono, ORPC)
-├── packages/
-│   ├── ui/          # Shared shadcn/ui components and styles
-│   ├── api/         # API layer / business logic
-│   └── db/          # Database schema & queries
-```
-
-## Available Scripts
-
-- `pnpm run dev`: Start all applications in development mode
-- `pnpm run build`: Build all applications
-- `pnpm run dev:web`: Start only the web application
-- `pnpm run dev:server`: Start only the server
-- `pnpm run check-types`: Check TypeScript types across all apps
-- `pnpm run db:push`: Push schema changes to database
-- `pnpm run db:generate`: Generate database client/types
-- `pnpm run db:migrate`: Run database migrations
-- `pnpm run db:studio`: Open database studio UI
-- `pnpm run check`: Run Oxlint and Oxfmt
-- `pnpm run docker:build`: Build the Docker Compose images
-- `pnpm run docker:up`: Build and start the Docker Compose stack
-- `pnpm run docker:logs`: Tail logs from the Docker Compose stack
-- `pnpm run docker:down`: Stop the Docker Compose stack
+**Security note.** The demo has no auth (`--auth none`). Anyone with the URL can create or delete tasks. Add auth before putting real data in it.
