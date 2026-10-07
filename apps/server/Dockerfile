@@ -3,7 +3,7 @@ RUN npm install -g pnpm@12
 WORKDIR /app
 
 COPY . .
-RUN --mount=type=cache,target=/pnpm-store pnpm install --frozen-lockfile --store-dir /pnpm-store
+RUN pnpm install --frozen-lockfile
 
 ENV NODE_ENV=production
 RUN cd apps/server && pnpm run build
