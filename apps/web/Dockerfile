@@ -3,7 +3,7 @@ RUN npm install -g pnpm@12
 WORKDIR /app
 
 COPY . .
-RUN --mount=type=cache,target=/pnpm-store pnpm install --frozen-lockfile --store-dir /pnpm-store
+RUN pnpm install --frozen-lockfile
 
 ARG VITE_SERVER_URL
 ENV VITE_SERVER_URL=${VITE_SERVER_URL}
