@@ -14,6 +14,7 @@ export const Route = createFileRoute("/")({
 
 function HomeComponent() {
   const [title, setTitle] = useState("");
+  const [priority, setPriority] = useState(0);
   const tasks = useQuery(orpc.task.list.queryOptions());
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: orpc.task.list.key() });
@@ -36,7 +37,7 @@ function HomeComponent() {
         className="mb-6 flex gap-2"
         onSubmit={(e) => {
           e.preventDefault();
-          if (title.trim()) createTask.mutate({ title });
+          if (title.trim()) createTask.mutate({ title, priority });
         }}
       >
         <Input
@@ -45,6 +46,18 @@ function HomeComponent() {
           placeholder="What needs to be done?"
           aria-label="New task title"
         />
+        <select
+          value={priority}
+          onChange={(e) => setPriority(Number(e.target.value))}
+          aria-label="Priority"
+          className="border bg-transparent px-2 text-xs"
+        >
+          {[0, 1, 2, 3].map((p) => (
+            <option key={p} value={p}>
+              P{p}
+            </option>
+          ))}
+        </select>
         <Button type="submit" disabled={createTask.isPending || !title.trim()}>
           Add
         </Button>
@@ -64,6 +77,9 @@ function HomeComponent() {
               <span className={`flex-1 ${t.done ? "text-muted-foreground line-through" : ""}`}>
                 {t.title}
               </span>
+              {t.priority > 0 && (
+                <span className="border px-1.5 text-xs text-muted-foreground">P{t.priority}</span>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
